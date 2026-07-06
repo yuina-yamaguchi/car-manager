@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import List
+from datetime import datetime, timedelta
 
 from ..database import get_db
 from .. import models, schemas
@@ -86,3 +87,73 @@ def delete_reservation(reservation_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="予約が見つかりません")
     db.delete(reservation)
     db.commit()
+
+
+@router.post("/recurring", status_code=201)
+def create_recurring_reservations(
+    car_id: int,
+    member_id: int,
+    start_time_str: str,  # 例: "05:30"
+    end_time_str: str,    # 例: "20:30"
+    start_date: str,      # 例: "2026-07-07"
+    weeks: int = 4,       # デフォルト4週間分
+    db: Session = Depends(get_db),
+):
+    """定期予約を一括作成（平日のみ、月〜金）"""
+    
+    # 車とメンバーの存在確認
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not car:
+        raise HTTPException(status_code=404, detail="車が見つかりません")
+    
+    member = db.query(models.Member).filter(models.Member.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="メンバーが見つかりません")
+    
+    # 開始日をパース
+    try:
+        current_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="日付形式が不正です（YYYY-MM-DD）")
+    
+    # 時刻をパース
+    try:
+        start_hour, start_min = map(int, start_time_str.split(":"))
+        end_hour, end_min = map(int, end_time_str.split(":"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="時刻形式が不正です（HH:MM）")
+    
+    created_count = 0
+    end_date = current_date + timedelta(weeks=weeks)
+    
+    while current_date < end_date:
+        # 平日のみ（月曜=0, 日曜=6）
+        if current_date.weekday() < 5:  # 0-4 = 月〜金
+            start_datetime = datetime.combine(current_date, datetime.min.time()).replace(
+                hour=start_hour, minute=start_min
+            )
+            end_datetime = datetime.combine(current_date, datetime.min.time()).replace(
+                hour=end_hour, minute=end_min
+            )
+            
+            # 重複チェック
+            conflict = check_conflict(db, car_id, start_datetime, end_datetime)
+            if not conflict:
+                reservation = models.Reservation(
+                    car_id=car_id,
+                    member_id=member_id,
+                    start_time=start_datetime,
+                    end_time=end_datetime,
+                    note="定期予約",
+                )
+                db.add(reservation)
+                created_count += 1
+        
+        current_date += timedelta(days=1)
+    
+    db.commit()
+    
+    return {
+        "message": f"{created_count}件の定期予約を作成しました",
+        "created_count": created_count,
+    }

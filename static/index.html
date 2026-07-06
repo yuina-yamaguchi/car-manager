@@ -237,6 +237,55 @@
     @media (min-width: 480px) {
       .status-grid { grid-template-columns: repeat(3, 1fr); }
     }
+
+    /* ── カレンダー ── */
+    .calendar-header {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .calendar-header span:first-child { color: #dc2626; }
+    .calendar-header span:last-child  { color: #2563eb; }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .cal-day {
+      min-height: 64px;
+      border-radius: 6px;
+      padding: 4px 3px;
+      background: var(--bg);
+      font-size: 0.75rem;
+    }
+    .cal-day.other-month { opacity: 0.3; }
+    .cal-day.today { background: #dbeafe; }
+    .cal-day .cal-date {
+      font-weight: 700;
+      margin-bottom: 2px;
+      font-size: 0.8rem;
+    }
+    .cal-day.sunday .cal-date  { color: #dc2626; }
+    .cal-day.saturday .cal-date { color: #2563eb; }
+    .cal-event {
+      background: var(--primary);
+      color: white;
+      border-radius: 3px;
+      padding: 1px 3px;
+      font-size: 0.65rem;
+      margin-top: 1px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .cal-event.event-1 { background: #2563eb; }
+    .cal-event.event-2 { background: #16a34a; }
+    .cal-event.event-3 { background: #d97706; }
+    .cal-event.event-4 { background: #dc2626; }
   </style>
 </head>
 <body>
@@ -250,11 +299,14 @@
   <button class="active" onclick="switchTab('home')" id="tab-home">
     <span class="tab-icon">🏠</span>ホーム
   </button>
+  <button onclick="switchTab('calendar')" id="tab-calendar">
+    <span class="tab-icon">📆</span>カレンダー
+  </button>
   <button onclick="switchTab('reserve')" id="tab-reserve">
     <span class="tab-icon">📅</span>予約する
   </button>
   <button onclick="switchTab('list')" id="tab-list">
-    <span class="tab-icon">📋</span>予約一覧
+    <span class="tab-icon">📋</span>一覧
   </button>
   <button onclick="switchTab('settings')" id="tab-settings">
     <span class="tab-icon">⚙️</span>設定
@@ -271,6 +323,18 @@
   <p class="section-title">今後の予約（直近5件）</p>
   <div id="home-reservations">
     <div class="loading">読み込み中...</div>
+  </div>
+</div>
+
+<!-- ── カレンダータブ ── -->
+<div class="tab-content" id="tab-content-calendar">
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <button class="btn btn-sm" style="background: #64748b; color: white;" onclick="changeMonth(-1)">◀ 前月</button>
+      <h3 id="calendar-title" style="margin: 0; font-size: 1.1rem;"></h3>
+      <button class="btn btn-sm" style="background: #64748b; color: white;" onclick="changeMonth(1)">次月 ▶</button>
+    </div>
+    <div id="calendar-grid"></div>
   </div>
 </div>
 
@@ -304,6 +368,43 @@
         <textarea id="note" placeholder="例：スーパーへ買い物"></textarea>
       </div>
       <button type="submit" class="btn btn-primary btn-block">予約する</button>
+    </form>
+  </div>
+
+  <!-- 定期予約フォーム -->
+  <div class="card">
+    <p class="card-title">🔁 定期予約を作成（平日自動）</p>
+    <form id="recurring-form" onsubmit="submitRecurring(event)">
+      <div class="form-group">
+        <label>使う人</label>
+        <select id="recurring-member-select" required>
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>車を選ぶ</label>
+        <select id="recurring-car-select" required>
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>開始時刻</label>
+        <input type="time" id="recurring-start-time" value="05:30" required />
+      </div>
+      <div class="form-group">
+        <label>終了時刻</label>
+        <input type="time" id="recurring-end-time" value="20:30" required />
+      </div>
+      <div class="form-group">
+        <label>開始日</label>
+        <input type="date" id="recurring-start-date" required />
+      </div>
+      <div class="form-group">
+        <label>週数</label>
+        <input type="number" id="recurring-weeks" value="4" min="1" max="12" required />
+        <small style="color: var(--muted); font-size: 0.8rem;">指定した週数分の平日（月〜金）に予約を作成します</small>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">定期予約を作成</button>
     </form>
   </div>
 </div>
@@ -407,6 +508,7 @@
     document.getElementById('tab-content-' + name).classList.add('active');
     document.getElementById('tab-' + name).classList.add('active');
     if (name === 'home') loadHome();
+    if (name === 'calendar') loadCalendar();
     if (name === 'reserve') loadReserveForm();
     if (name === 'list') loadReservationList();
     if (name === 'settings') loadSettings();
@@ -465,17 +567,24 @@
 
     const carSel = document.getElementById('car-select');
     const memSel = document.getElementById('member-select');
+    const rCarSel = document.getElementById('recurring-car-select');
+    const rMemSel = document.getElementById('recurring-member-select');
     carSel.innerHTML = '<option value="">選択してください</option>';
     memSel.innerHTML = '<option value="">選択してください</option>';
+    rCarSel.innerHTML = '<option value="">選択してください</option>';
+    rMemSel.innerHTML = '<option value="">選択してください</option>';
+
     cars.forEach(c => {
       const o = document.createElement('option');
       o.value = c.id; o.textContent = `${c.name}（${c.color}・${c.plate}）`;
       carSel.appendChild(o);
+      rCarSel.appendChild(o.cloneNode(true));
     });
     members.forEach(m => {
       const o = document.createElement('option');
       o.value = m.id; o.textContent = m.name;
       memSel.appendChild(o);
+      rMemSel.appendChild(o.cloneNode(true));
     });
 
     // デフォルト日時をセット（今から1時間後まで）
@@ -483,6 +592,12 @@
     const end   = new Date(start); end.setHours(end.getHours() + 1);
     document.getElementById('start-time').value = toLocalDatetimeValue(start);
     document.getElementById('end-time').value   = toLocalDatetimeValue(end);
+
+    // 定期予約の開始日をセット（今日）
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('recurring-start-date').value =
+      `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
   }
 
   function toLocalDatetimeValue(date) {
@@ -706,6 +821,122 @@
     } catch (err) {
       showToast('⚠️ ' + err.message, true);
     }
+  }
+
+  // ── 定期予約 ──────────────────────────────────────────
+  async function submitRecurring(e) {
+    e.preventDefault();
+    const carId    = document.getElementById('recurring-car-select').value;
+    const memberId = document.getElementById('recurring-member-select').value;
+    const startT   = document.getElementById('recurring-start-time').value;
+    const endT     = document.getElementById('recurring-end-time').value;
+    const startD   = document.getElementById('recurring-start-date').value;
+    const weeks    = document.getElementById('recurring-weeks').value;
+
+    const params = new URLSearchParams({
+      car_id: carId, member_id: memberId,
+      start_time_str: startT, end_time_str: endT,
+      start_date: startD, weeks: weeks,
+    });
+
+    try {
+      const res = await apiFetch(`/reservations/recurring?${params}`, { method: 'POST' });
+      showToast(`✅ ${res.created_count}件の定期予約を作成しました`);
+      document.getElementById('recurring-form').reset();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  // ── カレンダー ────────────────────────────────────────
+  let calYear  = new Date().getFullYear();
+  let calMonth = new Date().getMonth(); // 0-indexed
+
+  function changeMonth(delta) {
+    calMonth += delta;
+    if (calMonth < 0)  { calMonth = 11; calYear--; }
+    if (calMonth > 11) { calMonth = 0;  calYear++; }
+    loadCalendar();
+  }
+
+  async function loadCalendar() {
+    const reservations = await apiFetch('/reservations/');
+
+    // カラーマップ（車IDごとに色を割り当て）
+    const cars = await apiFetch('/cars/');
+    const carColorMap = {};
+    cars.forEach((car, i) => { carColorMap[car.id] = (i % 4) + 1; });
+
+    const title = document.getElementById('calendar-title');
+    title.textContent = `${calYear}年${calMonth + 1}月`;
+
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = '';
+
+    // 曜日ヘッダー
+    const header = document.createElement('div');
+    header.className = 'calendar-header';
+    ['日', '月', '火', '水', '木', '金', '土'].forEach(d => {
+      const span = document.createElement('span');
+      span.textContent = d;
+      header.appendChild(span);
+    });
+    grid.appendChild(header);
+
+    // カレンダーグリッド
+    const calGrid = document.createElement('div');
+    calGrid.className = 'calendar-grid';
+
+    const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=日
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const today = new Date();
+
+    // 前月の空白
+    for (let i = 0; i < firstDay; i++) {
+      const day = document.createElement('div');
+      day.className = 'cal-day other-month';
+      calGrid.appendChild(day);
+    }
+
+    // 当月の日付
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(calYear, calMonth, d);
+      const dow = date.getDay();
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+      const day = document.createElement('div');
+      day.className = 'cal-day';
+      if (dow === 0) day.classList.add('sunday');
+      if (dow === 6) day.classList.add('saturday');
+      if (date.toDateString() === today.toDateString()) day.classList.add('today');
+
+      const dateLabel = document.createElement('div');
+      dateLabel.className = 'cal-date';
+      dateLabel.textContent = d;
+      day.appendChild(dateLabel);
+
+      // その日の予約を表示
+      const dayReservations = reservations.filter(r => {
+        const rDate = new Date(r.start_time);
+        return rDate.getFullYear() === calYear &&
+               rDate.getMonth() === calMonth &&
+               rDate.getDate() === d;
+      });
+
+      dayReservations.forEach(r => {
+        const ev = document.createElement('div');
+        ev.className = `cal-event event-${carColorMap[r.car_id] || 1}`;
+        const startH = new Date(r.start_time).getHours().toString().padStart(2,'0');
+        const startM = new Date(r.start_time).getMinutes().toString().padStart(2,'0');
+        ev.textContent = `${startH}:${startM} ${r.member.name}`;
+        ev.title = `${r.car.name} / ${r.member.name}`;
+        day.appendChild(ev);
+      });
+
+      calGrid.appendChild(day);
+    }
+
+    grid.appendChild(calGrid);
   }
 
   // ── PWA Service Worker 登録 ──────────────────────────
