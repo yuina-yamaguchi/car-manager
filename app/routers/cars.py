@@ -33,6 +33,21 @@ def create_car(car: schemas.CarCreate, db: Session = Depends(get_db)):
     return db_car
 
 
+@router.put("/{car_id}", response_model=schemas.CarResponse)
+def update_car(car_id: int, car: schemas.CarCreate, db: Session = Depends(get_db)):
+    """車を更新"""
+    db_car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not db_car:
+        raise HTTPException(status_code=404, detail="車が見つかりません")
+    
+    for key, value in car.model_dump().items():
+        setattr(db_car, key, value)
+    
+    db.commit()
+    db.refresh(db_car)
+    return db_car
+
+
 @router.delete("/{car_id}", status_code=204)
 def delete_car(car_id: int, db: Session = Depends(get_db)):
     """車を削除"""

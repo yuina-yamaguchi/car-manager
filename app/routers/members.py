@@ -33,6 +33,21 @@ def create_member(member: schemas.MemberCreate, db: Session = Depends(get_db)):
     return db_member
 
 
+@router.put("/{member_id}", response_model=schemas.MemberResponse)
+def update_member(member_id: int, member: schemas.MemberCreate, db: Session = Depends(get_db)):
+    """メンバーを更新"""
+    db_member = db.query(models.Member).filter(models.Member.id == member_id).first()
+    if not db_member:
+        raise HTTPException(status_code=404, detail="メンバーが見つかりません")
+    
+    for key, value in member.model_dump().items():
+        setattr(db_member, key, value)
+    
+    db.commit()
+    db.refresh(db_member)
+    return db_member
+
+
 @router.delete("/{member_id}", status_code=204)
 def delete_member(member_id: int, db: Session = Depends(get_db)):
     """メンバーを削除"""

@@ -586,12 +586,15 @@
       cars.forEach(car => {
         const div = document.createElement('div');
         div.className = 'item-chip';
+        div.style.alignItems = 'center';
         div.innerHTML = `
           <span class="chip-icon">🚗</span>
-          <span class="chip-text">
+          <span class="chip-text" style="flex: 1;">
             <strong>${car.name}</strong>
             <span class="chip-sub">${car.color} · ${car.plate}</span>
           </span>
+          <button class="btn btn-sm" style="background: #64748b; color: white; margin-right: 4px;" onclick="editCar(${car.id}, '${car.name}', '${car.plate}', '${car.color}')">編集</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCar(${car.id})">削除</button>
         `;
         carsList.appendChild(div);
       });
@@ -605,7 +608,13 @@
       members.forEach(m => {
         const div = document.createElement('div');
         div.className = 'item-chip';
-        div.innerHTML = `<span class="chip-icon">👤</span><span class="chip-text">${m.name}</span>`;
+        div.style.alignItems = 'center';
+        div.innerHTML = `
+          <span class="chip-icon">👤</span>
+          <span class="chip-text" style="flex: 1;">${m.name}</span>
+          <button class="btn btn-sm" style="background: #64748b; color: white; margin-right: 4px;" onclick="editMember(${m.id}, '${m.name}')">編集</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMember(${m.id})">削除</button>
+        `;
         membersList.appendChild(div);
       });
     }
@@ -635,6 +644,64 @@
       await apiFetch('/members/', { method: 'POST', body: JSON.stringify({ name }) });
       document.getElementById('new-member-name').value = '';
       showToast('👤 メンバーを追加しました');
+      loadSettings();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  async function editCar(id, name, plate, color) {
+    const newName = prompt('車名を入力:', name);
+    if (newName === null) return;
+    const newPlate = prompt('ナンバーを入力:', plate);
+    if (newPlate === null) return;
+    const newColor = prompt('色を入力:', color);
+    if (newColor === null) return;
+    
+    try {
+      await apiFetch(`/cars/${id}`, { 
+        method: 'PUT', 
+        body: JSON.stringify({ name: newName, plate: newPlate, color: newColor }) 
+      });
+      showToast('✏️ 車を更新しました');
+      loadSettings();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  async function deleteCar(id) {
+    if (!confirm('この車を削除しますか？')) return;
+    try {
+      await apiFetch(`/cars/${id}`, { method: 'DELETE' });
+      showToast('🗑 車を削除しました');
+      loadSettings();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  async function editMember(id, name) {
+    const newName = prompt('名前を入力:', name);
+    if (newName === null || !newName.trim()) return;
+    
+    try {
+      await apiFetch(`/members/${id}`, { 
+        method: 'PUT', 
+        body: JSON.stringify({ name: newName }) 
+      });
+      showToast('✏️ メンバーを更新しました');
+      loadSettings();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  async function deleteMember(id) {
+    if (!confirm('このメンバーを削除しますか？')) return;
+    try {
+      await apiFetch(`/members/${id}`, { method: 'DELETE' });
+      showToast('🗑 メンバーを削除しました');
       loadSettings();
     } catch (err) {
       showToast('⚠️ ' + err.message, true);
