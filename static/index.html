@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="description" content="家族で車を共有するための予約管理アプリ" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+  <title>車管理アプリ</title>
+  <style>
+    /* ── リセット・ベース ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 12px;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+
+    /* ── ヘッダー ── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+    }
+    header h1 { font-size: 1.2rem; font-weight: 700; }
+    header p  { font-size: 0.8rem; opacity: 0.85; margin-top: 2px; }
+
+    /* ── タブナビ ── */
+    nav {
+      display: flex;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 64px;
+      z-index: 99;
+    }
+    nav button {
+      flex: 1;
+      padding: 12px 4px;
+      border: none;
+      background: none;
+      font-size: 0.75rem;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    nav button .tab-icon { font-size: 1.3rem; }
+    nav button.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* ── コンテンツ ── */
+    .tab-content { display: none; padding: 16px; }
+    .tab-content.active { display: block; }
+
+    /* ── カード ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    /* ── フォーム ── */
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: #fff;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* ── ボタン ── */
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      text-align: center;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary  { background: var(--primary); color: #fff; }
+    .btn-primary:hover  { background: var(--primary-dark); }
+    .btn-danger   { background: var(--danger); color: #fff; }
+    .btn-block    { width: 100%; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+    /* ── 予約リスト ── */
+    .reservation-item {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      border-left: 4px solid var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .reservation-info { flex: 1; min-width: 0; }
+    .reservation-car  { font-weight: 700; font-size: 1rem; }
+    .reservation-member { color: var(--primary); font-size: 0.85rem; font-weight: 600; margin-top: 2px; }
+    .reservation-time { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+    .reservation-note { color: var(--muted); font-size: 0.8rem; margin-top: 4px; font-style: italic; }
+
+    /* ── 車・メンバーリスト ── */
+    .item-list { display: flex; flex-direction: column; gap: 8px; }
+    .item-chip {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .item-chip .chip-icon { font-size: 1.2rem; }
+    .item-chip .chip-text { flex: 1; }
+    .item-chip .chip-sub { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── ステータスバッジ ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .badge-free    { background: #dcfce7; color: var(--success); }
+    .badge-inuse   { background: #fee2e2; color: var(--danger); }
+
+    /* ── セクション見出し ── */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 16px 0 8px;
+    }
+
+    /* ── トースト通知 ── */
+    #toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 200;
+      white-space: nowrap;
+      max-width: 90vw;
+      text-align: center;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #toast.error { background: var(--danger); }
+
+    /* ── ローディング ── */
+    .loading { text-align: center; color: var(--muted); padding: 32px; font-size: 0.9rem; }
+    .empty   { text-align: center; color: var(--muted); padding: 32px; font-size: 0.9rem; }
+
+    /* ── 現在の状況カード ── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .status-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      text-align: center;
+    }
+    .status-card .status-car-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+    .status-card .status-car-icon { font-size: 1.8rem; margin-bottom: 4px; }
+
+    @media (min-width: 480px) {
+      .status-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚗 車管理アプリ</h1>
+  <p id="current-time"></p>
+</header>
+
+<nav>
+  <button class="active" onclick="switchTab('home')" id="tab-home">
+    <span class="tab-icon">🏠</span>ホーム
+  </button>
+  <button onclick="switchTab('reserve')" id="tab-reserve">
+    <span class="tab-icon">📅</span>予約する
+  </button>
+  <button onclick="switchTab('list')" id="tab-list">
+    <span class="tab-icon">📋</span>予約一覧
+  </button>
+  <button onclick="switchTab('settings')" id="tab-settings">
+    <span class="tab-icon">⚙️</span>設定
+  </button>
+</nav>
+
+<!-- ── ホームタブ ── -->
+<div class="tab-content active" id="tab-content-home">
+  <p class="section-title">現在の車の状況</p>
+  <div class="status-grid" id="car-status-grid">
+    <div class="loading">読み込み中...</div>
+  </div>
+
+  <p class="section-title">今後の予約（直近5件）</p>
+  <div id="home-reservations">
+    <div class="loading">読み込み中...</div>
+  </div>
+</div>
+
+<!-- ── 予約するタブ ── -->
+<div class="tab-content" id="tab-content-reserve">
+  <div class="card">
+    <p class="card-title">🗓 新しい予約を作成</p>
+    <form id="reservation-form" onsubmit="submitReservation(event)">
+      <div class="form-group">
+        <label>使う人</label>
+        <select id="member-select" required>
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>車を選ぶ</label>
+        <select id="car-select" required>
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>開始日時</label>
+        <input type="datetime-local" id="start-time" required />
+      </div>
+      <div class="form-group">
+        <label>終了日時</label>
+        <input type="datetime-local" id="end-time" required />
+      </div>
+      <div class="form-group">
+        <label>メモ（任意）</label>
+        <textarea id="note" placeholder="例：スーパーへ買い物"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">予約する</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── 予約一覧タブ ── -->
+<div class="tab-content" id="tab-content-list">
+  <div id="reservation-list">
+    <div class="loading">読み込み中...</div>
+  </div>
+</div>
+
+<!-- ── 設定タブ ── -->
+<div class="tab-content" id="tab-content-settings">
+  <!-- 車の管理 -->
+  <div class="card">
+    <p class="card-title">🚗 車の管理</p>
+    <div class="item-list" id="cars-list">
+      <div class="loading">読み込み中...</div>
+    </div>
+    <hr style="margin: 12px 0; border-color: var(--border);" />
+    <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px;">車を追加</p>
+    <div class="form-group">
+      <label>車名</label>
+      <input type="text" id="new-car-name" placeholder="例：プリウス" />
+    </div>
+    <div class="form-group">
+      <label>ナンバー</label>
+      <input type="text" id="new-car-plate" placeholder="例：品川 300 あ 1234" />
+    </div>
+    <div class="form-group">
+      <label>色</label>
+      <input type="text" id="new-car-color" placeholder="例：白" />
+    </div>
+    <button class="btn btn-primary btn-block" onclick="addCar()">追加する</button>
+  </div>
+
+  <!-- 家族メンバーの管理 -->
+  <div class="card">
+    <p class="card-title">👤 家族メンバー</p>
+    <div class="item-list" id="members-list">
+      <div class="loading">読み込み中...</div>
+    </div>
+    <hr style="margin: 12px 0; border-color: var(--border);" />
+    <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px;">メンバーを追加</p>
+    <div class="form-group">
+      <label>名前</label>
+      <input type="text" id="new-member-name" placeholder="例：太郎" />
+    </div>
+    <button class="btn btn-primary btn-block" onclick="addMember()">追加する</button>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div id="toast"></div>
+
+<script>
+  // ── API ─────────────────────────────────────────────
+  const API = '/api';
+
+  async function apiFetch(path, options = {}) {
+    const res = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    if (!res.ok) {
+      let msg = 'エラーが発生しました';
+      try { const d = await res.json(); msg = d.detail || msg; } catch {}
+      throw new Error(msg);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  }
+
+  // ── トースト ─────────────────────────────────────────
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show' + (isError ? ' error' : '');
+    setTimeout(() => { t.className = ''; }, 3000);
+  }
+
+  // ── 時刻表示 ─────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('current-time').textContent =
+      now.toLocaleString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+  updateClock();
+  setInterval(updateClock, 60000);
+
+  // ── 日時フォーマット ─────────────────────────────────
+  function formatDatetime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── タブ切り替え ─────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-content-' + name).classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'home') loadHome();
+    if (name === 'reserve') loadReserveForm();
+    if (name === 'list') loadReservationList();
+    if (name === 'settings') loadSettings();
+  }
+
+  // ── ホーム ──────────────────────────────────────────
+  async function loadHome() {
+    const [cars, reservations] = await Promise.all([
+      apiFetch('/cars/'),
+      apiFetch('/reservations/'),
+    ]);
+
+    // 車のステータス
+    const now = new Date();
+    const grid = document.getElementById('car-status-grid');
+    grid.innerHTML = '';
+    for (const car of cars) {
+      const inUse = reservations.find(r =>
+        r.car_id === car.id &&
+        new Date(r.start_time) <= now &&
+        new Date(r.end_time) >= now
+      );
+      const div = document.createElement('div');
+      div.className = 'status-card';
+      div.innerHTML = `
+        <div class="status-car-icon">🚗</div>
+        <div class="status-car-name">${car.name}</div>
+        <div class="badge ${inUse ? 'badge-inuse' : 'badge-free'}">
+          ${inUse ? `${inUse.member.name}が使用中` : '空き'}
+        </div>
+      `;
+      grid.appendChild(div);
+    }
+
+    // 直近5件の予約
+    const upcoming = reservations
+      .filter(r => new Date(r.end_time) >= now)
+      .slice(0, 5);
+    const container = document.getElementById('home-reservations');
+    container.innerHTML = '';
+    if (upcoming.length === 0) {
+      container.innerHTML = '<div class="empty">予約はありません</div>';
+      return;
+    }
+    for (const r of upcoming) {
+      container.appendChild(createReservationCard(r, false));
+    }
+  }
+
+  // ── 予約フォーム ─────────────────────────────────────
+  async function loadReserveForm() {
+    const [cars, members] = await Promise.all([
+      apiFetch('/cars/'),
+      apiFetch('/members/'),
+    ]);
+
+    const carSel = document.getElementById('car-select');
+    const memSel = document.getElementById('member-select');
+    carSel.innerHTML = '<option value="">選択してください</option>';
+    memSel.innerHTML = '<option value="">選択してください</option>';
+    cars.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = `${c.name}（${c.color}・${c.plate}）`;
+      carSel.appendChild(o);
+    });
+    members.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.id; o.textContent = m.name;
+      memSel.appendChild(o);
+    });
+
+    // デフォルト日時をセット（今から1時間後まで）
+    const start = new Date(); start.setMinutes(0, 0, 0); start.setHours(start.getHours() + 1);
+    const end   = new Date(start); end.setHours(end.getHours() + 1);
+    document.getElementById('start-time').value = toLocalDatetimeValue(start);
+    document.getElementById('end-time').value   = toLocalDatetimeValue(end);
+  }
+
+  function toLocalDatetimeValue(date) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  async function submitReservation(e) {
+    e.preventDefault();
+    try {
+      await apiFetch('/reservations/', {
+        method: 'POST',
+        body: JSON.stringify({
+          car_id:     parseInt(document.getElementById('car-select').value),
+          member_id:  parseInt(document.getElementById('member-select').value),
+          start_time: document.getElementById('start-time').value,
+          end_time:   document.getElementById('end-time').value,
+          note:       document.getElementById('note').value,
+        }),
+      });
+      showToast('✅ 予約しました！');
+      document.getElementById('reservation-form').reset();
+      loadReserveForm();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  // ── 予約一覧 ─────────────────────────────────────────
+  async function loadReservationList() {
+    const reservations = await apiFetch('/reservations/');
+    const container = document.getElementById('reservation-list');
+    container.innerHTML = '';
+
+    if (reservations.length === 0) {
+      container.innerHTML = '<div class="empty">予約はありません</div>';
+      return;
+    }
+
+    // 過去と将来で分ける
+    const now = new Date();
+    const upcoming = reservations.filter(r => new Date(r.end_time) >= now);
+    const past     = reservations.filter(r => new Date(r.end_time) <  now).reverse();
+
+    if (upcoming.length > 0) {
+      const title = document.createElement('p');
+      title.className = 'section-title';
+      title.textContent = '今後の予約';
+      container.appendChild(title);
+      upcoming.forEach(r => container.appendChild(createReservationCard(r, true)));
+    }
+
+    if (past.length > 0) {
+      const title = document.createElement('p');
+      title.className = 'section-title';
+      title.textContent = '過去の予約';
+      container.appendChild(title);
+      past.forEach(r => container.appendChild(createReservationCard(r, false)));
+    }
+  }
+
+  function createReservationCard(r, showDelete) {
+    const div = document.createElement('div');
+    div.className = 'reservation-item';
+    div.innerHTML = `
+      <div class="reservation-info">
+        <div class="reservation-car">🚗 ${r.car.name}</div>
+        <div class="reservation-member">👤 ${r.member.name}</div>
+        <div class="reservation-time">🕐 ${formatDatetime(r.start_time)} 〜 ${formatDatetime(r.end_time)}</div>
+        ${r.note ? `<div class="reservation-note">📝 ${r.note}</div>` : ''}
+      </div>
+      ${showDelete ? `<button class="btn btn-danger btn-sm" onclick="cancelReservation(${r.id})">キャンセル</button>` : ''}
+    `;
+    return div;
+  }
+
+  async function cancelReservation(id) {
+    if (!confirm('この予約をキャンセルしますか？')) return;
+    try {
+      await apiFetch(`/reservations/${id}`, { method: 'DELETE' });
+      showToast('🗑 予約をキャンセルしました');
+      loadReservationList();
+      loadHome();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  // ── 設定 ─────────────────────────────────────────────
+  async function loadSettings() {
+    const [cars, members] = await Promise.all([
+      apiFetch('/cars/'),
+      apiFetch('/members/'),
+    ]);
+
+    const carsList = document.getElementById('cars-list');
+    carsList.innerHTML = '';
+    if (cars.length === 0) {
+      carsList.innerHTML = '<div class="empty">車が登録されていません</div>';
+    } else {
+      cars.forEach(car => {
+        const div = document.createElement('div');
+        div.className = 'item-chip';
+        div.innerHTML = `
+          <span class="chip-icon">🚗</span>
+          <span class="chip-text">
+            <strong>${car.name}</strong>
+            <span class="chip-sub">${car.color} · ${car.plate}</span>
+          </span>
+        `;
+        carsList.appendChild(div);
+      });
+    }
+
+    const membersList = document.getElementById('members-list');
+    membersList.innerHTML = '';
+    if (members.length === 0) {
+      membersList.innerHTML = '<div class="empty">メンバーが登録されていません</div>';
+    } else {
+      members.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'item-chip';
+        div.innerHTML = `<span class="chip-icon">👤</span><span class="chip-text">${m.name}</span>`;
+        membersList.appendChild(div);
+      });
+    }
+  }
+
+  async function addCar() {
+    const name  = document.getElementById('new-car-name').value.trim();
+    const plate = document.getElementById('new-car-plate').value.trim();
+    const color = document.getElementById('new-car-color').value.trim();
+    if (!name || !plate || !color) { showToast('⚠️ すべての項目を入力してください', true); return; }
+    try {
+      await apiFetch('/cars/', { method: 'POST', body: JSON.stringify({ name, plate, color }) });
+      document.getElementById('new-car-name').value  = '';
+      document.getElementById('new-car-plate').value = '';
+      document.getElementById('new-car-color').value = '';
+      showToast('🚗 車を追加しました');
+      loadSettings();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  async function addMember() {
+    const name = document.getElementById('new-member-name').value.trim();
+    if (!name) { showToast('⚠️ 名前を入力してください', true); return; }
+    try {
+      await apiFetch('/members/', { method: 'POST', body: JSON.stringify({ name }) });
+      document.getElementById('new-member-name').value = '';
+      showToast('👤 メンバーを追加しました');
+      loadSettings();
+    } catch (err) {
+      showToast('⚠️ ' + err.message, true);
+    }
+  }
+
+  // ── PWA Service Worker 登録 ──────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/service-worker.js').catch(() => {});
+  }
+
+  // ── 初期ロード ────────────────────────────────────────
+  loadHome();
+</script>
+</body>
+</html>
