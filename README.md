@@ -130,3 +130,81 @@ http://localhost:8000/docs
 del car_manager.db
 python seed.py
 ```
+
+
+---
+
+## 外部公開デプロイ（Turso + FastAPI Cloud）
+
+データはTursoクラウドに永続保存されます。期限なしの無料枠があります。
+
+### Step 1: Tursoのセットアップ
+
+**Turso CLIをインストール**
+```bash
+# Windows（winget）
+winget install turso
+```
+
+**ログイン＆DBを作成**
+```bash
+turso auth login
+turso db create car-manager
+```
+
+**接続情報を取得**
+```bash
+turso db show --url car-manager   # TURSO_DATABASE_URL
+turso db tokens create car-manager  # TURSO_AUTH_TOKEN
+```
+
+表示された値をメモしておく（後でFastAPI Cloudに登録します）。
+
+---
+
+### Step 2: FastAPI Cloudにデプロイ
+
+**FastAPI Cloud CLIはfastapi[standard]に含まれています**（別途インストール不要）。
+
+**ログイン**
+```bash
+fastapi login
+```
+ブラウザが開くのでGitHubアカウントでサインアップ・ログイン。
+
+**デプロイ**
+```bash
+cd car-manager
+fastapi deploy
+```
+
+**環境変数を設定**
+```bash
+fastapi env set TURSO_DATABASE_URL libsql://<your-db>.turso.io
+fastapi env set TURSO_AUTH_TOKEN <your-token>
+```
+
+設定後、自動で再デプロイされます。
+
+**初期データを投入**
+```bash
+fastapi run seed.py
+```
+
+---
+
+### Step 3: アクセス
+
+デプロイ完了後、以下のようなURLでアクセスできます：
+```
+https://car-manager.fastapicloud.dev
+```
+
+スマホのブラウザで開いて「ホーム画面に追加」すればアプリとして使えます。
+
+---
+
+### 注意事項
+- Turso無料枠：500DB、9GBストレージ、期限なし
+- FastAPI Cloud：パブリックベータ中（料金は公式サイトで確認）
+- ローカル開発は引き続きSQLite（`car_manager.db`）が使われます

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: car-manager
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: TURSO_DATABASE_URL
+        sync: false   # Renderダッシュボードで手動設定
+      - key: TURSO_AUTH_TOKEN
+        sync: false   # Renderダッシュボードで手動設定
+      - key: PYTHON_VERSION
+        value: 3.11.0
